@@ -44,6 +44,7 @@ def index():
     return render_template('index.html')
 
 
+# 진행중인 상태를 클라이언트에서 조회해서 가져오기 위함 
 @app.route('/active-message')
 def active_message():
 
@@ -60,15 +61,20 @@ def active_message():
 
 
     if session_state.question:
+        # 제일 처음에 아무것도 진행중이지 않을떄 화두로 저렇게 말함 
         if not session_state.in_progress:
+            # 진행중으로 만듬 
             session_state.in_progress = True
+            # 리드와 팔로워를 설정 
             session_state.dialog_lead, session_state.dialog_follower = session_state.socrates, session_state.theaetetus
             return jsonify([
                 {'role':'socrates',
                 'response': f"Hi Theaetetus, let's solve this problem together. Please feel free to correct me if I make any logical or mathematical mistakes.\n"}
                 ])
         else:
+            # 유저한테 질문한 상태가 아니고, 서브 프로그래스가 진행중이지 않을때? 
             if session_state.in_progress_sub == False and session_state.wait_tony == False:
+                # 서브 프로그레스 진행중으로 ( 중복 방지 )
                 session_state.in_progress_sub = True
                 msg_list = []
                 rep = session_state.dialog_follower.get_response()
@@ -77,8 +83,8 @@ def active_message():
                 session_state.plato.update_history(f"{session_state.dialog_follower.role}: "+rep)
                 reference = ask_WolframAlpha(rep)
                 question_to_tony = need_to_ask_Tony(rep)
-                python_code_write = write_Python(rep)
-                python_code_exe = execute_Python(rep)
+                #python_code_write = write_Python(rep)
+                #python_code_exe = execute_Python(rep)
                 if reference:
                     for ref in reference:
                         q, a = ref["question"], ref["answer"]
@@ -95,87 +101,87 @@ def active_message():
                          'response': f"Asking Tony: {session_state.all_questions_to_tony}"})
                     session_state.wait_tony = True
 
-                elif (not python_code_write is None) or (not python_code_exe is None):
-                    if not python_code_write is None:
-                        if len(python_code_write) > 0:
-                            if session_state.interactive_p is None:
-                                session_state.interactive_p = subprocess.Popen(["python"],
-                                                                 stdin=subprocess.PIPE, 
-                                                                 stdout=subprocess.PIPE, 
-                                                                 stderr=subprocess.PIPE, 
-                                                                universal_newlines=True)
-                                for cd_w in python_code_write:
-                                    session_state.interactive_p.stdin.write(cd_w + "\n")
-                                    session_state.interactive_p.stdin.flush()
-                            else:
-                                for cd_w in python_code_write:
-                                    session_state.interactive_p.stdin.write(cd_w + "\n")
-                                    session_state.interactive_p.stdin.flush()
+                # elif (not python_code_write is None) or (not python_code_exe is None):
+                #     if not python_code_write is None:
+                #         if len(python_code_write) > 0:
+                #             if session_state.interactive_p is None:
+                #                 session_state.interactive_p = subprocess.Popen(["python"],
+                #                                                  stdin=subprocess.PIPE, 
+                #                                                  stdout=subprocess.PIPE, 
+                #                                                  stderr=subprocess.PIPE, 
+                #                                                 universal_newlines=True)
+                #                 for cd_w in python_code_write:
+                #                     session_state.interactive_p.stdin.write(cd_w + "\n")
+                #                     session_state.interactive_p.stdin.flush()
+                #             else:
+                #                 for cd_w in python_code_write:
+                #                     session_state.interactive_p.stdin.write(cd_w + "\n")
+                #                     session_state.interactive_p.stdin.flush()
 
-                    if not python_code_exe is None:
+                #     if not python_code_exe is None:
 
-                        print("executing...")
+                #         print("executing...")
 
-                        if not session_state.interactive_p is None:
-                            try:
-                                if len(python_code_exe) > 0:
-                                    output_msg, err_msg = session_state.interactive_p.communicate(python_code_exe[0] + "\n", timeout=60)
-                                else:
-                                    output_msg, err_msg = session_state.interactive_p.communicate(timeout=60)
+                #         if not session_state.interactive_p is None:
+                #             try:
+                #                 if len(python_code_exe) > 0:
+                #                     output_msg, err_msg = session_state.interactive_p.communicate(python_code_exe[0] + "\n", timeout=60)
+                #                 else:
+                #                     output_msg, err_msg = session_state.interactive_p.communicate(timeout=60)
 
-                                if len(err_msg) == 0:
-                                    if len(output_msg) > 0:
-                                        msg_list.append(
-                                            {'role': 'system', 
-                                            'response': f"Ran the above Python scripts and got an output: `{output_msg}`\n"})
-                                        session_state.socrates.add_python_feedback(output_msg)
-                                        session_state.theaetetus.add_python_feedback(output_msg)
-                                        session_state.plato.add_python_feedback(output_msg)
+                #                 if len(err_msg) == 0:
+                #                     if len(output_msg) > 0:
+                #                         msg_list.append(
+                #                             {'role': 'system', 
+                #                             'response': f"Ran the above Python scripts and got an output: `{output_msg}`\n"})
+                #                         session_state.socrates.add_python_feedback(output_msg)
+                #                         session_state.theaetetus.add_python_feedback(output_msg)
+                #                         session_state.plato.add_python_feedback(output_msg)
 
-                                    else:
-                                        output_msg = "Ran the above Python scripts and but got an empty output. Did you `print()` the results? Please rewrite the program and then execute. To write code, please state @write_code first, and then wrap your code in a markdown block.\n"
-                                        msg_list.append(
-                                            {'role': 'system', 
-                                            'response': output_msg})
+                #                     else:
+                #                         output_msg = "Ran the above Python scripts and but got an empty output. Did you `print()` the results? Please rewrite the program and then execute. To write code, please state @write_code first, and then wrap your code in a markdown block.\n"
+                #                         msg_list.append(
+                #                             {'role': 'system', 
+                #                             'response': output_msg})
                                     
-                                        session_state.socrates.add_python_feedback(output_msg)
-                                        session_state.theaetetus.add_python_feedback(output_msg)
-                                        session_state.plato.add_python_feedback(output_msg)
+                #                         session_state.socrates.add_python_feedback(output_msg)
+                #                         session_state.theaetetus.add_python_feedback(output_msg)
+                #                         session_state.plato.add_python_feedback(output_msg)
                                     
-                                else:
-                                    msg_list.append(
-                                        {'role': 'system', 
-                                        'response': f"Ran the above Python scripts and got an error message: `{err_msg}`\n"})
+                #                 else:
+                #                     msg_list.append(
+                #                         {'role': 'system', 
+                #                         'response': f"Ran the above Python scripts and got an error message: `{err_msg}`\n"})
 
-                                    session_state.socrates.add_python_feedback(err_msg)
-                                    session_state.theaetetus.add_python_feedback(err_msg)
-                                    session_state.plato.add_python_feedback(err_msg)
+                #                     session_state.socrates.add_python_feedback(err_msg)
+                #                     session_state.theaetetus.add_python_feedback(err_msg)
+                #                     session_state.plato.add_python_feedback(err_msg)
 
-                            except TimeoutExpired as e:
+                #             except TimeoutExpired as e:
 
-                                    err_msg = "Your script has exceeded the time limit of 60 seconds. Please consider rewriting your code to improve its efficiency."
+                #                     err_msg = "Your script has exceeded the time limit of 60 seconds. Please consider rewriting your code to improve its efficiency."
 
-                                    msg_list.append(
-                                        {'role': 'system', 
-                                        'response': f"Ran the above Python scripts and got an error message: `{err_msg}`\n"})
+                #                     msg_list.append(
+                #                         {'role': 'system', 
+                #                         'response': f"Ran the above Python scripts and got an error message: `{err_msg}`\n"})
 
-                                    session_state.socrates.add_python_feedback(err_msg)
-                                    session_state.theaetetus.add_python_feedback(err_msg)
-                                    session_state.plato.add_python_feedback(err_msg)
+                #                     session_state.socrates.add_python_feedback(err_msg)
+                #                     session_state.theaetetus.add_python_feedback(err_msg)
+                #                     session_state.plato.add_python_feedback(err_msg)
 
-                            session_state.interactive_p = None  
+                #             session_state.interactive_p = None  
 
-                        else:
-                            err_msg = "Please rewrite the program and then execute. To write code, please state @write_code first, and then wrap your code in a markdown block.\n"
-                            msg_list.append(
-                                {'role': 'system', 
-                                'response': err_msg})
-                            session_state.socrates.add_python_feedback(err_msg)
-                            session_state.theaetetus.add_python_feedback(err_msg)
-                            session_state.plato.add_python_feedback(err_msg)
+                #         else:
+                #             err_msg = "Please rewrite the program and then execute. To write code, please state @write_code first, and then wrap your code in a markdown block.\n"
+                #             msg_list.append(
+                #                 {'role': 'system', 
+                #                 'response': err_msg})
+                #             session_state.socrates.add_python_feedback(err_msg)
+                #             session_state.theaetetus.add_python_feedback(err_msg)
+                #             session_state.plato.add_python_feedback(err_msg)
 
-                    print("received code", python_code_write)
-                    print("execute code", python_code_exe)
+                #     print("received code", python_code_write)
+                #     print("execute code", python_code_exe)
 
                 elif ("@final answer" in rep) or ("bye" in rep) or ("The context length exceeds my limit..." in rep):
                     session_state.question = None
